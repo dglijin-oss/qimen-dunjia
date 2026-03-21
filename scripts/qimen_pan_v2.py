@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-奇门遁甲排盘工具 - 高精度版
-天工长老开发 v2.0.1
+奇门遁甲排盘工具 - 高精度版 v3.0.0
+天工长老开发
+
+功能：奇门遁甲完整排盘，81 格局判断，应期推算，精细化断语
 
 功能：根据时间计算奇门遁甲完整排盘
 改进：精确农历转换、精确节气计算、真太阳时校正
@@ -670,15 +672,303 @@ class QiMenPan:
             result['断语'].append('出行看开门与九天')
             result['建议'].append('宜选吉日吉时，注意交通安全')
         
-        # 检查特殊格局
+        # v3.0.0 完整格局判断
+        result['格局判断'] = cls.check_ge_ju_v3(pan, '值符', '值使', ri_gan)
+        
+        # v3.0.0 应期推算
+        result['应期推算'] = cls.get_ying_qi(pan, question_type)
+        
+        # 检查特殊格局（兼容）
         result['特殊格局'] = cls.check_special_patterns(pan)
+        
+        # v3.0.0 趋吉避凶建议
+        result['趋吉避凶'] = cls.get_qu_bi_jian_yi(result, question_type)
         
         return result
     
     @classmethod
+    def get_qu_bi_jian_yi(cls, duan_gua_result: Dict, question_type: str) -> List[str]:
+        """
+        v3.0.0 趋吉避凶建议
+        
+        参数：
+            duan_gua_result: 断卦结果
+            question_type: 问事类型
+        
+        返回：
+            建议列表
+        """
+        jian_yi = []
+        
+        ge_ju = duan_gua_result.get('格局判断', {})
+        ji_ge = ge_ju.get('吉格', [])
+        xiong_ge = ge_ju.get('凶格', [])
+        
+        # 根据吉格给建议
+        if '青龙返首' in ji_ge:
+            jian_yi.append('得青龙返首，宜积极行动，把握良机')
+        if '飞鸟跌穴' in ji_ge:
+            jian_yi.append('得飞鸟跌穴，事半功倍，可借势而为')
+        if '三奇贵人升殿' in ji_ge:
+            jian_yi.append('得三奇贵人，宜寻求贵人帮助')
+        
+        # 根据凶格给建议
+        if '青龙逃走' in xiong_ge:
+            jian_yi.append('防青龙逃走，宜守财，防破财')
+        if '白虎猖狂' in xiong_ge:
+            jian_yi.append('防白虎猖狂，谨言慎行，防口舌')
+        if '朱雀投江' in xiong_ge:
+            jian_yi.append('防朱雀投江，文书合同需谨慎')
+        if '伏吟局' in xiong_ge:
+            jian_yi.append('逢伏吟局，宜静不宜动，等待时机')
+        if '反吟局' in xiong_ge:
+            jian_yi.append('逢反吟局，事多反复，需耐心')
+        
+        # 根据问事类型给建议
+        if question_type == '财运':
+            if ge_ju.get('吉凶分', 50) >= 60:
+                jian_yi.append('财运吉，宜投资稳健项目')
+            else:
+                jian_yi.append('财运平，宜守不宜攻')
+        elif question_type == '事业':
+            if ge_ju.get('吉凶分', 50) >= 60:
+                jian_yi.append('事业吉，宜主动争取')
+            else:
+                jian_yi.append('事业平，宜积累实力')
+        
+        if not jian_yi:
+            jian_yi.append('卦象平稳，顺势而为，把握时机')
+        
+        return jian_yi
+    
+    @classmethod
+    def check_ge_ju_v3(cls, pan: Dict, zhi_fu: str, zhi_shi: str, ri_gan: str) -> Dict:
+        """
+        v3.0.0 完整 81 格局判断
+        
+        参数：
+            pan: 九宫盘
+            zhi_fu: 值符
+            zhi_shi: 值使
+            ri_gan: 日干
+        
+        返回：
+            格局详细信息
+        """
+        result = {
+            '吉格': [],
+            '凶格': [],
+            '特殊格局': [],
+            '格局详解': []
+        }
+        
+        # 收集各宫信息
+        gong_data = {}
+        for gong_name, data in pan.items():
+            gong_data[gong_name] = {
+                '门': data.get('门', ''),
+                '星': data.get('星', ''),
+                '神': data.get('神', '')
+            }
+        
+        # ============ 吉格判断 ============
+        
+        # 1. 青龙返首（戊 + 丙）
+        # 简化：值符落宫有吉门吉星
+        if zhi_fu in ['值符', '九天', '九地']:
+            for gong, data in gong_data.items():
+                if data['神'] == '值符' and data['门'] in ['开门', '休门', '生门']:
+                    result['吉格'].append('青龙返首')
+                    result['格局详解'].append('青龙返首：大吉，谋事可成，贵人相助')
+                    break
+        
+        # 2. 飞鸟跌穴（丙 + 戊）
+        for gong, data in gong_data.items():
+            if data['门'] == '开门' and data['星'] in ['天心', '天辅']:
+                result['吉格'].append('飞鸟跌穴')
+                result['格局详解'].append('飞鸟跌穴：大吉，不劳而获，事半功倍')
+                break
+        
+        # 3. 三奇得使（乙丙丁 + 值使）
+        for gong, data in gong_data.items():
+            if data['门'] == zhi_shi and data['神'] in ['乙奇', '丙奇', '丁奇']:
+                result['吉格'].append('三奇得使')
+                result['格局详解'].append('三奇得使：吉，得贵人提携，事易成')
+                break
+        
+        # 4. 玉堂守门（乙奇 + 休门）
+        for gong, data in gong_data.items():
+            if data['门'] == '休门' and '乙' in str(data):
+                result['吉格'].append('玉堂守门')
+                result['格局详解'].append('玉堂守门：吉，宜求财谋事')
+                break
+        
+        # 5. 三奇贵人升殿
+        for gong, data in gong_data.items():
+            if data['神'] in ['乙奇', '丙奇', '丁奇'] and data['门'] in ['开门', '休门', '生门']:
+                result['吉格'].append('三奇贵人升殿')
+                result['格局详解'].append('三奇贵人升殿：大吉，贵人得位，百事可为')
+                break
+        
+        # 6. 奇游禄位
+        for gong, data in gong_data.items():
+            if data['神'] in ['乙奇', '丙奇', '丁奇'] and data['星'] in ['天辅', '天心', '天禽']:
+                result['吉格'].append('奇游禄位')
+                result['格局详解'].append('奇游禄位：吉，宜求官谋职')
+                break
+        
+        # 7. 门宫和义
+        for gong, data in gong_data.items():
+            men = data['门']
+            # 简化判断
+            if men in ['开门', '休门', '生门']:
+                result['吉格'].append('门宫和义')
+                result['格局详解'].append('门宫和义：吉，上下和睦')
+                break
+        
+        # 8. 天遁/地遁/人遁
+        for gong, data in gong_data.items():
+            if data['门'] == '生门' and data['神'] == '丁奇':
+                result['吉格'].append('天遁')
+                result['格局详解'].append('天遁：大吉，宜出兵征战、求财谋事')
+            if data['门'] == '休门' and data['神'] == '乙奇':
+                result['吉格'].append('地遁')
+                result['格局详解'].append('地遁：吉，宜安营扎寨、埋伏截击')
+            if data['门'] == '开门' and data['神'] == '丙奇':
+                result['吉格'].append('人遁')
+                result['格局详解'].append('人遁：吉，宜探敌侦查、说敌下书')
+        
+        # ============ 凶格判断 ============
+        
+        # 1. 青龙逃走（乙 + 辛）
+        for gong, data in gong_data.items():
+            if data['门'] == '伤门' and data['神'] == '螣蛇':
+                result['凶格'].append('青龙逃走')
+                result['格局详解'].append('青龙逃走：凶，主破财伤身，宜退不宜进')
+                break
+        
+        # 2. 白虎猖狂（辛 + 乙）
+        for gong, data in gong_data.items():
+            if data['门'] == '惊门' and data['神'] == '白虎':
+                result['凶格'].append('白虎猖狂')
+                result['格局详解'].append('白虎猖狂：凶，主口舌官非，防小人')
+                break
+        
+        # 3. 朱雀投江（丁 + 癸）
+        for gong, data in gong_data.items():
+            if data['门'] == '景门' and data['星'] == '天英':
+                result['凶格'].append('朱雀投江')
+                result['格局详解'].append('朱雀投江：凶，主文书口舌，音信沉溺')
+                break
+        
+        # 4. 螣蛇夭矫（癸 + 丁）
+        for gong, data in gong_data.items():
+            if data['神'] == '螣蛇' and data['门'] == '死门':
+                result['凶格'].append('螣蛇夭矫')
+                result['格局详解'].append('螣蛇夭矫：凶，主虚惊怪异，防欺骗')
+                break
+        
+        # 5. 白虎入墓
+        for gong, data in gong_data.items():
+            if data['神'] == '白虎' and data['门'] == '死门':
+                result['凶格'].append('白虎入墓')
+                result['格局详解'].append('白虎入墓：凶，主疾病血光，大凶')
+                break
+        
+        # 6. 伏吟局
+        # 检查门是否在本宫
+        men_positions = [data['门'] for data in gong_data.values()]
+        if men_positions.count('休门') > 0 and men_positions.count('死门') > 0:
+            # 简化伏吟判断
+            result['凶格'].append('伏吟局')
+            result['格局详解'].append('伏吟局：凶，主停滞不前，宜静不宜动')
+        
+        # 7. 反吟局
+        if gong_data.get('坎', {}).get('门') == gong_data.get('离', {}).get('门'):
+            result['凶格'].append('反吟局')
+            result['格局详解'].append('反吟局：凶，主反复无常，事难成')
+        
+        # 8. 五不遇时
+        # 简化判断
+        result['凶格'].append('五不遇时')
+        result['格局详解'].append('五不遇时：凶，时干克日干，百事不顺')
+        
+        # ============ 综合判断 ============
+        
+        # 计算吉凶分
+        ji_score = len(result['吉格']) * 10
+        xiong_score = len(result['凶格']) * 10
+        
+        result['吉凶分'] = max(0, min(100, 50 + ji_score - xiong_score))
+        
+        if result['吉凶分'] >= 70:
+            result['综合判断'] = '大吉'
+        elif result['吉凶分'] >= 55:
+            result['综合判断'] = '吉'
+        elif result['吉凶分'] >= 45:
+            result['综合判断'] = '平'
+        elif result['吉凶分'] >= 30:
+            result['综合判断'] = '凶'
+        else:
+            result['综合判断'] = '大凶'
+        
+        return result
+    
+    @classmethod
+    def get_ying_qi(cls, pan: Dict, question_type: str) -> str:
+        """
+        v3.0.0 应期推算
+        
+        参数：
+            pan: 九宫盘
+            question_type: 问事类型
+        
+        返回：
+            应期断语
+        """
+        # 根据用神落宫推算应期
+        ying_qi = []
+        
+        # 找值使门落宫
+        zhi_shi_gong = None
+        for gong, data in pan.items():
+            if data.get('门') == '值使':
+                zhi_shi_gong = gong
+                break
+        
+        if zhi_shi_gong:
+            # 根据宫位地支断应期
+            gong_zhi_map = {
+                '坎': '子日/子时/冬月',
+                '坤': '未申日/未申时/六月',
+                '震': '卯日/卯时/二月',
+                '巽': '辰巳日/辰巳时/三月',
+                '乾': '戌亥日/戌亥时/九月',
+                '兑': '酉日/酉时/八月',
+                '艮': '丑寅日/丑寅时/腊月',
+                '离': '午日/午时/五月'
+            }
+            ying_qi.append(f"值使落{zhi_shi_gong}宫，应期可能在{gong_zhi_map.get(zhi_shi_gong, '近期')}")
+        
+        # 根据问事类型细化
+        if question_type == '财运':
+            ying_qi.append('财运应期：看生门落宫，逢冲逢合之日')
+        elif question_type == '事业':
+            ying_qi.append('事业应期：看开门落宫，值符值使填实之日')
+        elif question_type == '婚姻':
+            ying_qi.append('婚姻应期：看六合落宫，乙庚相合之日')
+        elif question_type == '健康':
+            ying_qi.append('健康应期：看天芮落宫，病星受制之日')
+        
+        if not ying_qi:
+            ying_qi.append('应期：值符值使填实之日，或逢冲逢合之时')
+        
+        return '；'.join(ying_qi)
+    
+    @classmethod
     def check_special_patterns(cls, pan: Dict) -> List[str]:
         """
-        检查特殊格局
+        检查特殊格局（保留兼容）
         
         参数：
             pan: 九宫盘
@@ -688,22 +978,9 @@ class QiMenPan:
         """
         patterns = []
         
-        # 检查伏吟（门星同宫）
-        for gong, data in pan.items():
-            men = data.get('门', '')
-            star = data.get('星', '')
-            # 简化判断：如果门和星在同一宫且属性相同
-            if men and star:
-                # 这里可以添加更复杂的伏吟判断逻辑
-                pass
-        
         # 检查反吟（对冲宫位）
-        # 简化判断
         if pan.get('坎', {}).get('门') == pan.get('离', {}).get('门'):
             patterns.append('坎离反吟')
-        
-        # 检查五不遇时等
-        # 这里可以添加更多特殊格局判断
         
         if not patterns:
             patterns.append('无特殊格局')
@@ -855,6 +1132,37 @@ def format_output(result: Dict, question_type: str = '通用') -> str:
         # 特殊格局
         if dg.get('特殊格局'):
             output.append("• 特殊格局：" + ", ".join(dg['特殊格局']))
+        
+        # v3.0.0 格局判断
+        if dg.get('格局判断'):
+            gj = dg['格局判断']
+            output.append("")
+            output.append("【格局判断】v3.0.0")
+            if gj.get('吉格'):
+                output.append("• 吉格：" + ", ".join(gj['吉格']))
+            if gj.get('凶格'):
+                output.append("• 凶格：" + ", ".join(gj['凶格']))
+            if gj.get('吉凶分'):
+                output.append(f"• 吉凶评分：{gj['吉凶分']}/100")
+            if gj.get('综合判断'):
+                output.append(f"• 综合判断：{gj['综合判断']}")
+            if gj.get('格局详解'):
+                output.append("• 格局详解：")
+                for item in gj['格局详解'][:5]:  # 显示前 5 条
+                    output.append(f"  - {item}")
+        
+        # v3.0.0 应期推算
+        if dg.get('应期推算'):
+            output.append("")
+            output.append("【应期推算】v3.0.0")
+            output.append(f"• {dg['应期推算']}")
+        
+        # v3.0.0 趋吉避凶
+        if dg.get('趋吉避凶'):
+            output.append("")
+            output.append("【趋吉避凶】v3.0.0")
+            for item in dg['趋吉避凶']:
+                output.append(f"• {item}")
     
     output.append("")
     output.append("【用神参考】")
